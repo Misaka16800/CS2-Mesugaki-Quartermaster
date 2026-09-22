@@ -262,6 +262,8 @@ namespace Cs2Roulette
 
         protected override void OnPaint(PaintEventArgs e)
         {
+            // 最小化时控件可能塌成 0 尺寸，GDI+ 会抛异常
+            if (ClientSize.Width <= 1 || ClientSize.Height <= 1) return;
             var g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
             var r = new Rectangle(0, 0, Width - 1, Height - 1);
@@ -741,6 +743,8 @@ namespace Cs2Roulette
 
         protected override void OnPaint(PaintEventArgs e)
         {
+            // 最小化时控件可能塌成 0 尺寸，GDI+ 会抛异常
+            if (ClientSize.Width <= 1 || ClientSize.Height <= 1) return;
             var g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
             using (var b = new SolidBrush(BackColor)) g.FillRectangle(b, ClientRectangle);

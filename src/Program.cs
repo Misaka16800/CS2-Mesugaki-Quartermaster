@@ -8,6 +8,33 @@ namespace Cs2Roulette
 {
     internal static class Program
     {
+        /// <summary>把崩溃信息写入 error.log（不弹窗，便于自动化抓取）。</summary>
+        private static void LogCrash(string tag, Exception ex)
+        {
+            try
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine("====================");
+                sb.AppendLine(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff") + "  [" + tag + "]");
+                sb.AppendLine(ex == null ? "(null exception)" : ex.ToString());
+                // 附上一些窗口状态，便于判断是否与最小化/尺寸有关
+                try
+                {
+                    foreach (Form f in Application.OpenForms)
+                        sb.AppendLine("  Form: " + f.GetType().Name
+                            + " WindowState=" + f.WindowState
+                            + " ClientSize=" + f.ClientSize
+                            + " Bounds=" + f.Bounds);
+                }
+                catch { }
+                sb.AppendLine();
+                File.AppendAllText(
+                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "error.log"),
+                    sb.ToString(), new UTF8Encoding(false));
+            }
+            catch { }
+        }
+
         [STAThread]
         private static void Main(string[] args)
         {
@@ -15,6 +42,20 @@ namespace Cs2Roulette
             {
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
+
+                // ---- 全局异常记录：写日志而不是弹窗，便于排查 ----
+                Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+                Application.ThreadException += (s, e) =>
+                {
+                    LogCrash("UI", e.Exception);
+                    MessageBox.Show("出错了：\r\n\r\n" + e.Exception.Message
+                        + "\r\n\r\n详细信息已写入 error.log",
+                        "CS2 雌小鬼军需", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                };
+                AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+                {
+                    LogCrash("Domain", e.ExceptionObject as Exception);
+                };
 
                 // 数据目录：优先 exe 同级的 data，其次当前目录，最后上一级
                 string dataDir = null;
@@ -70,6 +111,7 @@ namespace Cs2Roulette
                 bool testOffer = false;
                 bool autoSell = false;
                 bool autoKeep = false;
+                bool showAbout = false;
                 int drawCount = 1;
                 string poolSwitch = null;
                 int startTab = 0;
@@ -153,7 +195,7 @@ namespace Cs2Roulette
                     }
                 }
 
-                Application.Run(new MainForm(db, dataDir, save, autoDraw, startTab, forceJackpot, autoPool, benchDraw, testVault, testDebug, testTrade, testLimit, testQuiz, quizDist, testCmp, poolDump, forceCoins, autoPoolKey, testCd, drawCount, testOffer, autoSell, autoKeep, poolSwitch));
+                Application.Run(new MainForm(db, dataDir, save, autoDraw, startTab, forceJackpot, autoPool, benchDraw, testVault, testDebug, testTrade, testLimit, testQuiz, quizDist, testCmp, poolDump, forceCoins, autoPoolKey, testCd, drawCount, testOffer, autoSell, autoKeep, poolSwitch, showAbout));
             }
             catch (Exception ex)
             {

@@ -227,6 +227,7 @@ namespace Cs2Roulette
         readonly bool _testOffer;
         readonly bool _autoSell;
         readonly bool _autoKeep;
+        readonly bool _showAbout;
         readonly int _drawCount;
         readonly string _poolSwitch;
         readonly bool _benchDraw;
@@ -254,9 +255,13 @@ namespace Cs2Roulette
         FlowLayoutPanel _vaultList;
         NeonButton _btnRecycleAll;
 
-        public MainForm(ItemDatabase db, string dataDir, SaveData save, bool autoDraw = false, int startTab = 0, bool forceJackpot = false, int autoPoolIndex = 0, bool benchDraw = false, bool testVault = false, bool testDebug = false, int testTrade = 0, bool testLimit = false, int testQuiz = 0, int quizDist = 0, int testCmp = 0, bool poolDump = false, long forceCoins = -1, string autoPoolKey = null, bool testCd = false, int drawCount = 1, bool testOffer = false, bool autoSell = false, bool autoKeep = false, string poolSwitch = null)
+        public MainForm(ItemDatabase db, string dataDir, SaveData save, bool autoDraw = false, int startTab = 0, bool forceJackpot = false, int autoPoolIndex = 0, bool benchDraw = false, bool testVault = false, bool testDebug = false, int testTrade = 0, bool testLimit = false, int testQuiz = 0, int quizDist = 0, int testCmp = 0, bool poolDump = false, long forceCoins = -1, string autoPoolKey = null, bool testCd = false, int drawCount = 1, bool testOffer = false, bool autoSell = false, bool autoKeep = false, string poolSwitch = null, bool showAbout = false)
         {
             _ui = InitUiAssets(dataDir);
+            // F1 打开「关于」——水印入口，删起来麻烦
+            this.KeyPreview = true;
+            this.KeyDown += (s, ev) => { if (ev.KeyCode == Keys.F1) ShowAbout(); };
+            if (_showAbout) Shown += (s, ev) => ShowAbout();
             _db = db;
             _dataDir = dataDir;
             _save = save;
@@ -269,6 +274,7 @@ namespace Cs2Roulette
             _testOffer = testOffer;
             _autoSell = autoSell;
             _autoKeep = autoKeep;
+            _showAbout = showAbout;
             _drawCount = drawCount;
             _poolSwitch = poolSwitch;
             _benchDraw = benchDraw;
@@ -284,7 +290,7 @@ namespace Cs2Roulette
             if (benchDraw) { try { AttachConsole(-1); } catch { } }
             _cache = new ImageCache(System.IO.Path.Combine(dataDir, "images"));
 
-            Text = "CS2 抽奖模拟器 ｜ 才不是给你白嫖的呢";
+            Text = "CS2 雌小鬼军需 ｜ HFUT2026_CKX免费分享 ｜ 才不是给你白嫖的呢";
             var wa = Screen.FromPoint(Cursor.Position).WorkingArea;
             ClientSize = new Size(Math.Min(1280, wa.Width - 60), Math.Min(820, wa.Height - 60));
             MinimumSize = new Size(1040, 700);
@@ -592,7 +598,7 @@ namespace Cs2Roulette
             var header = new Panel { BackColor = Color.Transparent, Height = 110 };
             var title = new Label
             {
-                Text = "CS2 抽奖模拟器 ~ 手气差就别怪我哦",
+                Text = "CS2 雌小鬼军需 ｜ HFUT2026_CKX免费分享",
                 Font = new Font("Microsoft YaHei UI", 16f, FontStyle.Bold),
                 ForeColor = TextMain,
                 BackColor = Color.Transparent,
@@ -601,7 +607,7 @@ namespace Cs2Roulette
             };
             var sub = new Label
             {
-                Text = "CS2 SKIN ROULETTE · 金币是本小姐赏你的，不能换钱啦",
+                Text = "HFUT2026_CKX 免费分享 · 金币是本小姐赏你的，不能换钱啦",
                 Font = new Font("Segoe UI", 8f, FontStyle.Bold),
                 ForeColor = Accent,
                 BackColor = Color.Transparent,
@@ -2249,6 +2255,68 @@ namespace Cs2Roulette
             _offerPane.Location = new Point(x, y);
         }
 
+        /// <summary>关于对话框：展示分享水印，防止来源被抹掉。</summary>
+        private void ShowAbout()
+        {
+            var f = new Form
+            {
+                Text = "关于 · HFUT2026_CKX免费分享",
+                ClientSize = new Size(430, 300),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                BackColor = Theme.BgDeep,
+                ForeColor = Theme.TextMain,
+            };
+            var fTitle = new Font("Microsoft YaHei UI", 14f, FontStyle.Bold);
+            var fMark = new Font("Microsoft YaHei UI", 12f, FontStyle.Bold);
+            var fBody = new Font("Microsoft YaHei UI", 9f);
+
+            var lbl = new Label
+            {
+                Text = "CS2 雌小鬼军需\nCS2 Mesugaki Quartermaster",
+                Font = fTitle,
+                ForeColor = Theme.AccentLite,
+                Location = new Point(22, 16),
+                Size = new Size(386, 56),
+            };
+            var lblMark = new Label
+            {
+                Text = "HFUT2026_CKX免费分享    禁止倒卖收费",
+                Font = fMark,
+                ForeColor = Theme.Gold,
+                Location = new Point(22, 76),
+                Size = new Size(386, 30),
+            };
+            var lblInfo = new Label
+            {
+                Text = "C# WinForms 实现，无第三方依赖\n"
+                     + "金币与饰品均为虚拟，不涉及真实货币或交易\n"
+                     + "本程序由 HFUT2026_CKX 免费分享，请勿付费购买\n\n"
+                     + "如果它是你花钱买来的 —— 那你被骗了。\n\n"
+                     + "（按 F1 可随时打开本窗口）",
+                Font = fBody,
+                ForeColor = Theme.TextDim,
+                Location = new Point(22, 116),
+                Size = new Size(386, 120),
+            };
+            var btn = new NeonButton
+            {
+                Text = "知道啦",
+                Accent = Theme.Accent,
+                Size = new Size(120, 36),
+                Location = new Point(155, 248),
+            };
+            btn.Click += (s, e) => f.Close();
+
+            f.Controls.Add(lbl);
+            f.Controls.Add(lblMark);
+            f.Controls.Add(lblInfo);
+            f.Controls.Add(btn);
+            f.ShowDialog(this);
+        }
+
         /// <summary>造一个带蓝色光晕的立绘控件（固定位置版，用于绝对定位页面）。</summary>
         private Panel MakeMascotPanel(string imgName, int x, int y, int w, int h)
         {
@@ -2406,6 +2474,8 @@ namespace Cs2Roulette
         {
             var g = e.Graphics;
             var r = ClientRectangle;
+            // 最小化时 ClientSize 会变成 0x0，GDI+ 建渐变会抛 ArgumentException
+            if (r.Width <= 1 || r.Height <= 1) return;
             using (var lg = new LinearGradientBrush(r, BgTop, BgBottom, 62f))
                 g.FillRectangle(lg, r);
             g.SmoothingMode = SmoothingMode.AntiAlias;
