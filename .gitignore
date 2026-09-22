@@ -1,0 +1,71 @@
+# ============================================================
+#  CS2 饰品抽奖模拟器 —— 开源仓库 .gitignore
+# ============================================================
+#  【重要】下列目录/文件含有第三方版权内容或个人信息，
+#          已在开源版本中排除，请勿取消忽略。
+# ============================================================
+
+# ---------- 版权素材（Valve）—— 绝不可提交 ----------
+images/
+cs2-skins/
+
+# ---------- 个人信息（浏览器调试 profile，含登录 cookie）----------
+#  绝不能上传：里面有你的登录态
+edge-profile/
+*.cookie
+cookies.txt
+
+# ---------- 第三方数据（体积大 / 平台数据）----------
+buff_raw*.jsonl
+buff_tx*.jsonl
+prices_template.csv
+skins.json
+skins-zh.json
+manifest.json
+
+# ---------- 由脚本生成的数据 ----------
+data/items.json
+data/prices.json
+data/excluded.json
+data/_illegal_wear_ids.json
+data/*.bak
+data/*.pre-*
+data/*.before-*
+
+# ---------- 构建产物 ----------
+build/
+release/
+audio-export/
+audio-export-delta/
+out/
+*.exe
+*.pdb
+*.dll
+
+# ---------- 开发中间文件 ----------
+shots/
+tmp/
+research/
+builder/
+__pycache__/
+*.pyc
+*.pyo
+*.log
+error.log
+layout_diag.txt
+paint_diag.txt
+uirect.txt
+box_diag.txt
+build_log.txt
+
+# ---------- 存档 ----------
+data/save.json
+
+# ---------- 编辑器 / 系统 ----------
+.vs/
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
