@@ -1,4 +1,4 @@
-# CS2 饰品抽奖模拟器 —— 构建脚本
+﻿# CS2 饰品抽奖模拟器 —— 构建脚本
 # 用法: powershell -ExecutionPolicy Bypass -File build.ps1
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
@@ -57,6 +57,14 @@ if (Test-Path "assets\ui") {
   New-Item -ItemType Directory -Force -Path "release\data\ui" | Out-Null
   Copy-Item "assets\ui\*" "release\data\ui\" -Force
 }
+
+# 数据文件加密（分发用）。明文 → CKXE 魔数 + XOR
+# 密钥由 "HFUT2026_CKX免费分享" 派生，水印与数据绑定
+Write-Output "      encrypting data ..."
+python tools\encrypt_data.py "release\data" 2>&1 | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "data encryption failed" }
+# 清理明文备份，避免随包分发
+Get-ChildItem "release\data" -Filter "*.plain" -ErrorAction SilentlyContinue | Remove-Item -Force
 
 Write-Output "[3/3] done"
 $exe = Get-Item "release\CS2Roulette.exe"
