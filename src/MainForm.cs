@@ -228,6 +228,7 @@ namespace Cs2Roulette
         readonly bool _autoSell;
         readonly bool _autoKeep;
         readonly bool _showAbout;
+        readonly int _poolStat;
         readonly int _drawCount;
         readonly string _poolSwitch;
         readonly bool _benchDraw;
@@ -255,7 +256,7 @@ namespace Cs2Roulette
         FlowLayoutPanel _vaultList;
         NeonButton _btnRecycleAll;
 
-        public MainForm(ItemDatabase db, string dataDir, SaveData save, bool autoDraw = false, int startTab = 0, bool forceJackpot = false, int autoPoolIndex = 0, bool benchDraw = false, bool testVault = false, bool testDebug = false, int testTrade = 0, bool testLimit = false, int testQuiz = 0, int quizDist = 0, int testCmp = 0, bool poolDump = false, long forceCoins = -1, string autoPoolKey = null, bool testCd = false, int drawCount = 1, bool testOffer = false, bool autoSell = false, bool autoKeep = false, string poolSwitch = null, bool showAbout = false)
+        public MainForm(ItemDatabase db, string dataDir, SaveData save, bool autoDraw = false, int startTab = 0, bool forceJackpot = false, int autoPoolIndex = 0, bool benchDraw = false, bool testVault = false, bool testDebug = false, int testTrade = 0, bool testLimit = false, int testQuiz = 0, int quizDist = 0, int testCmp = 0, bool poolDump = false, long forceCoins = -1, string autoPoolKey = null, bool testCd = false, int drawCount = 1, bool testOffer = false, bool autoSell = false, bool autoKeep = false, string poolSwitch = null, bool showAbout = false, int poolStat = 0)
         {
             _ui = InitUiAssets(dataDir);
             // F1 打开「关于」——水印入口，删起来麻烦
@@ -275,6 +276,7 @@ namespace Cs2Roulette
             _autoSell = autoSell;
             _autoKeep = autoKeep;
             _showAbout = showAbout;
+            _poolStat = poolStat;
             _drawCount = drawCount;
             _poolSwitch = poolSwitch;
             _benchDraw = benchDraw;
@@ -479,6 +481,51 @@ namespace Cs2Roulette
                     var tEnd2 = new Timer { Interval = delay + 500 };
                     tEnd2.Tick += (ss, ee) => { tEnd2.Stop(); tEnd2.Dispose(); };
                     tEnd2.Start();
+                    return;
+                }
+
+
+                // 奖池统计压测（--poolstat N）：每池抽 N 次，输出实测分布
+                if (_poolStat > 0)
+                {
+                    var rnd2 = new Random(12345);
+                    Console.WriteLine("POOLSTAT times=" + _poolStat);
+                    foreach (var pool in _db.Pools)
+                    {
+                        if (pool.Items.Count == 0) continue;
+                        // 只统计特点池与奇迹池，避免刷屏
+                        if (pool.Kind != "weighted" && pool.Kind != "miracle") continue;
+
+                        long sum = 0, spent = 0;
+                        int c0 = 0, c1 = 0, c2 = 0, c3 = 0, c4 = 0, cTop = 0;
+                        double maxP = 0;
+                        foreach (var it in pool.Items)
+                            if (it.PriceUsdCents > maxP) maxP = it.PriceUsdCents;
+
+                        for (int k = 0; k < _poolStat; k++)
+                        {
+                            var it = pool.Pick(rnd2);
+                            double p = it.PriceUsd;
+                            sum += it.PriceUsdCents;
+                            spent += pool.CostCents;
+                            if (p < 2) c0++;
+                            else if (p < 50) c1++;
+                            else if (p < 500) c2++;
+                            else if (p < 2000) c3++;
+                            else c4++;
+                            if (p >= maxP - 0.01) cTop++;
+                        }
+                        double N = _poolStat;
+                        double avg = sum / N / 100.0;
+                        double costGold = pool.CostCents;
+                        double ret = spent > 0 ? (double)sum / spent : 0;   // 成本已由期望回收反解，这里直接比
+                        Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
+                            "POOLSTAT {0}|cost={1}|avg=${2:F2}|ret={3:P2}|"
+                            + "<2={4:P1}|2-50={5:P1}|50-500={6:P1}|500-2000={7:P1}|2000+={8:P1}|top={9:P3}",
+                            pool.Name, costGold, avg, ret,
+                            c0 / N, c1 / N, c2 / N, c3 / N, c4 / N, cTop / N));
+                    }
+                    BeginInvoke((Action)Close);
                     return;
                 }
 

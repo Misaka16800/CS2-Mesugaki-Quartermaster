@@ -112,6 +112,7 @@ namespace Cs2Roulette
                 bool autoSell = false;
                 bool autoKeep = false;
                 bool showAbout = false;
+                int poolStat = 0;
                 int drawCount = 1;
                 string poolSwitch = null;
                 int startTab = 0;
@@ -145,6 +146,11 @@ namespace Cs2Roulette
                         testOffer = true;
                     else if (string.Equals(args[i], "--testcd", StringComparison.OrdinalIgnoreCase))
                         testCd = true;
+                    else if (string.Equals(args[i], "--poolstat", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+                    {
+                        int pv;
+                        if (int.TryParse(args[i + 1], out pv)) poolStat = pv;
+                    }
                     else if (string.Equals(args[i], "--pooldump", StringComparison.OrdinalIgnoreCase))
                         poolDump = true;
                     else if (string.Equals(args[i], "--coins", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
@@ -195,7 +201,7 @@ namespace Cs2Roulette
                     }
                 }
 
-                Application.Run(new MainForm(db, dataDir, save, autoDraw, startTab, forceJackpot, autoPool, benchDraw, testVault, testDebug, testTrade, testLimit, testQuiz, quizDist, testCmp, poolDump, forceCoins, autoPoolKey, testCd, drawCount, testOffer, autoSell, autoKeep, poolSwitch, showAbout));
+                Application.Run(new MainForm(db, dataDir, save, autoDraw, startTab, forceJackpot, autoPool, benchDraw, testVault, testDebug, testTrade, testLimit, testQuiz, quizDist, testCmp, poolDump, forceCoins, autoPoolKey, testCd, drawCount, testOffer, autoSell, autoKeep, poolSwitch, showAbout, poolStat));
             }
             catch (Exception ex)
             {

@@ -113,6 +113,63 @@ namespace Cs2Roulette
 
         public bool IsMiracle { get { return Kind == "miracle"; } }
 
+        // ---- 加权抽取（Kind == "weighted"）----
+        /// <summary>与 Items 一一对应的抽取权重；为空表示均匀随机。</summary>
+        public double[] Weights;
+        /// <summary>累计权重表（加速抽取，Pick 时惰性构建）。</summary>
+        double[] _cum;
+
+        /// <summary>是否按权重抽取。</summary>
+        public bool IsWeighted { get { return Weights != null && Weights.Length == Items.Count; } }
+
+        /// <summary>按权重抽一次。</summary>
+        Item PickWeighted(Random rnd)
+        {
+            if (_cum == null || _cum.Length != Weights.Length)
+            {
+                _cum = new double[Weights.Length];
+                double acc = 0;
+                for (int i = 0; i < Weights.Length; i++)
+                {
+                    acc += Weights[i];
+                    _cum[i] = acc;
+                }
+            }
+            double total = _cum[_cum.Length - 1];
+            if (total <= 0) return Items[rnd.Next(Items.Count)];
+            double r = rnd.NextDouble() * total;
+            // 二分查找
+            int lo = 0, hi = _cum.Length - 1;
+            while (lo < hi)
+            {
+                int mid = (lo + hi) / 2;
+                if (_cum[mid] < r) lo = mid + 1; else hi = mid;
+            }
+            return Items[lo];
+        }
+
+        /// <summary>
+        /// 按给定权重计算「期望回收」（美分），用于反解成本。
+        /// 权重不必归一化。
+        /// </summary>
+        public long ExpectedRecycleCents()
+        {
+            if (!IsWeighted)
+            {
+                long s0 = 0;
+                foreach (var it in Items) s0 += it.PriceUsdCents;
+                return s0 / Math.Max(1, Items.Count);
+            }
+            double sum = 0, acc = 0;
+            for (int i = 0; i < Items.Count; i++)
+            {
+                sum += Weights[i];
+                acc += Weights[i] * Items[i].PriceUsdCents;
+            }
+            if (sum <= 0) return 0;
+            return (long)Math.Round(acc / sum);
+        }
+
         /// <summary>极品均价（美分）。</summary>
         public long RareAvgCents
         {
@@ -142,6 +199,7 @@ namespace Cs2Roulette
                     return RareItems[rnd.Next(RareItems.Count)];
                 return CheapItem;
             }
+            if (IsWeighted) return PickWeighted(rnd);
             return Items[rnd.Next(Items.Count)];
         }
     }
@@ -175,7 +233,7 @@ namespace Cs2Roulette
                 throw new FileNotFoundException("缺少饰品数据: " + itemsPath);
 
             // 显式 UTF-8，避免中文名乱码
-            string json = File.ReadAllText(itemsPath, new UTF8Encoding(false));
+            string json = Crypto.ReadText(itemsPath);
             var root = Json.Obj(Json.Parse(json));
 
             foreach (var o in Json.ArrOf(root, "items"))
@@ -215,7 +273,7 @@ namespace Cs2Roulette
             if (!File.Exists(path)) return;
             try
             {
-                string json = File.ReadAllText(path, new UTF8Encoding(false));
+                string json = Crypto.ReadText(path);
                 var root = Json.Obj(Json.Parse(json));
                 foreach (var o in Json.ArrOf(root, "ids"))
                 {
@@ -246,7 +304,7 @@ namespace Cs2Roulette
             {
                 try
                 {
-                    string json = File.ReadAllText(pricesPath, new UTF8Encoding(false));
+                    string json = Crypto.ReadText(pricesPath);
                     var root = Json.Obj(Json.Parse(json));
                     object pv;
                     if (root.TryGetValue("prices", out pv) && pv != null)
@@ -356,17 +414,120 @@ namespace Cs2Roulette
             // 极品概率是设计输入（每次抽中原价最高的那批饰品的机会）
             p.RareChance = MiracleRareChance;
 
-            // 由「回报率固定 75%」解出单抽成本：
-            //   期望回收 E = 0.9 · [ p·R + (1−p)·B ]
-            //   成本 K     = E / 0.75
-            double expect = 0.9 * (p.RareChance * R + (1.0 - p.RareChance) * B);
-            p.CostCents = (long)Math.Round(expect / StandardReturnRate);
+            // 期望均价（不加 0.9）：这是「抽一次平均拿到多少市价」
+            long avgPrice = (long)Math.Round(p.RareChance * R + (1.0 - p.RareChance) * B);
+
+            // 与加权池统一口径：成本 = 期望均价 ÷ 0.75
+            //   于是回报率 = 期望均价 / 成本 = 0.75，精确 75%。
+            //   【坑】不要把 0.9（回收折扣）乘进来：
+            //   早期写成 cost = 0.9·EV / 0.75，导致回报率被抬到 83%。
+            long K = (long)Math.Round(avgPrice / StandardReturnRate);
+            p.CostCents = K < 1 ? 1 : K;
+            long expect = avgPrice;
             if (p.CostCents < 1) p.CostCents = 1;
 
             // 展示用的"均价"与回收价（按成本口径反推，保持与其它池一致）
-            p.AvgPriceCents = (long)Math.Round(p.CostCents * 1.20);
-            p.RecycleCents = (long)Math.Round(expect);
+            p.AvgPriceCents = avgPrice;
+            p.RecycleCents = (long)Math.Round(avgPrice * 0.90);
             return p;
+        }
+
+        /// <summary>
+        /// 建一个「按权重抽取」的池子。
+        ///
+        /// 关键：成本不是拍脑袋定的，而是由权重算出的期望回收反解：
+        ///     成本 K = 期望回收 E ÷ 0.75
+        /// 因此无论权重怎么设计，回报率都恒等于 75%，与其它池同一口径。
+        /// </summary>
+        private Pool MakeWeightedPool(string key, string name, List<Item> items,
+                                      double[] weights, int colorSeed)
+        {
+            var p = new Pool
+            {
+                Key = key,
+                Name = name,
+                Kind = "weighted",
+                Accent = AccentFor(key, colorSeed),
+            };
+            p.Items.AddRange(items);
+            // Items 按价格降序排，权重必须跟着一起重排
+            var idx = new List<int>();
+            for (int i = 0; i < items.Count; i++) idx.Add(i);
+            idx.Sort((a, b) => items[b].PriceUsdCents.CompareTo(items[a].PriceUsdCents));
+
+            var sortedItems = new List<Item>();
+            var sortedW = new double[idx.Count];
+            for (int i = 0; i < idx.Count; i++)
+            {
+                sortedItems.Add(items[idx[i]]);
+                sortedW[i] = weights[idx[i]];
+            }
+            p.Items.Clear();
+            p.Items.AddRange(sortedItems);
+            p.Weights = sortedW;
+            p.Cover = p.Items.Count > 0 ? p.Items[0] : null;
+
+            long E = p.ExpectedRecycleCents();          // 期望回收（已含匹配率无关，纯按权重）
+            p.CostCents = (long)Math.Round(E / StandardReturnRate);
+            if (p.CostCents < 1) p.CostCents = 1;
+            p.AvgPriceCents = (long)Math.Round(p.CostCents * 1.20);
+            p.RecycleCents = E;
+            return p;
+        }
+
+        /// <summary>
+        /// 排名衰减权重：按「价格从低到高」的名次给权重。
+        ///
+        ///   w_i = ratio ^ (rank_i / halfLife)
+        ///
+        /// rank 0 是最便宜的（权重最高），名次越大权重越小。
+        /// 用名次而非价格比，避免被 $0.003 这类极值把分布压垮。
+        ///   ratio=0.5, halfLife=2000  →  第 2000 名权重减半，最贵件约 0.5%
+        /// </summary>
+        private static double[] RankWeights(List<Item> items, double ratio, double halfLife)
+        {
+            int n = items.Count;
+            var idx = new int[n];
+            for (int i = 0; i < n; i++) idx[i] = i;
+            Array.Sort(idx, (a, b) => items[a].PriceUsdCents.CompareTo(items[b].PriceUsdCents));
+
+            var w = new double[n];
+            for (int rank = 0; rank < n; rank++)
+                w[idx[rank]] = Math.Pow(ratio, rank / halfLife);
+            return w;
+        }
+
+        /// <summary>
+        /// 价格阶梯权重：按价位区间给固定概率。
+        /// brackets 形如 { {100, 0.60}, {500, 0.25}, {2000, 0.12}, {无穷, 0.03} }
+        /// 含义是「价格 < 上界」的区间占总概率的该比例。
+        /// </summary>
+        private static double[] BracketWeights(List<Item> items, double[][] brackets)
+        {
+            var w = new double[items.Count];
+            // 先数每个区间有多少件
+            var cnt = new int[brackets.Length];
+            var slot = new int[items.Count];
+            for (int i = 0; i < items.Count; i++)
+            {
+                // 注意：brackets 的阈值是「美元」，这里必须用 PriceUsd，
+                // 早期误用 PriceUsdCents（分）导致所有物品都落进最后一档。
+                double p = items[i].PriceUsd;
+                int b = brackets.Length - 1;
+                for (int k = 0; k < brackets.Length; k++)
+                {
+                    if (p < brackets[k][0]) { b = k; break; }
+                }
+                slot[i] = b;
+                cnt[b]++;
+            }
+            // 区间总概率平摊到区间内每件 -> 实现「该区间的总命中率 = 设定值」
+            for (int i = 0; i < items.Count; i++)
+            {
+                int b = slot[i];
+                w[i] = cnt[b] > 0 ? brackets[b][1] / cnt[b] : 0;
+            }
+            return w;
         }
 
         private Pool MakePool(string key, string name, string kind, List<Item> items, int colorSeed)
@@ -437,6 +598,7 @@ namespace Cs2Roulette
             if (usable.Count > 0) Pools.Add(MakePool("s:all", "全饰品池", "special", usable, seed++));
 
             // 5) 奇迹池：极品极低概率 + 便宜保底，回报率与其它池持平
+            BuildWeightedPools(usable, ref seed);
             BuildMiraclePools(usable, ref seed);
 
             // 按“封面价值”从高到低排列，顶级池排前面
@@ -453,6 +615,77 @@ namespace Cs2Roulette
         /// 每个池子 = 若干极品 + 1 个便宜保底，极品以极低概率掉落。
         /// 保底价位取「最便宜的一档」的均价，使便宜饰品本身不至于毫无价值。
         /// </summary>
+        /// <summary>
+        /// 4 个「特点池」：每个池子对应一种概率分布。
+        /// 成本全部由「期望回收 ÷ 0.75」反解，回报率恒为 75%。
+        /// </summary>
+        private void BuildWeightedPools(List<Item> usable, ref int seed)
+        {
+            if (usable.Count < 200) return;
+
+            var byPrice = new List<Item>(usable);
+            byPrice.Sort((a, b) => a.PriceUsdCents.CompareTo(b.PriceUsdCents));
+            int n = byPrice.Count;
+
+            // ---------- 1) 白嫖极限池：幂律偏斜 ----------
+            // 越贵越难出，但尾巴够长 —— 一直抽一直有小钱，偶尔爆一次
+            {
+                var items = new List<Item>(usable);
+                // 中位名次附近权重减半 -> 便宜件占大头，但尾巴够长
+                var w = RankWeights(items, 0.5, 1500);
+                AddPool(MakeWeightedPool("w:payoff", "白嫖极限池", items, w, seed++));
+            }
+
+            // ---------- 2) 阶梯池：按价位给固定概率 ----------
+            // 60% 便宜 / 25% 中档 / 12% 高档 / 3% 顶级
+            {
+                var items = new List<Item>(usable);
+                var br = new double[][]
+                {
+                    new double[] { 50,    0.60 },
+                    new double[] { 500,   0.25 },
+                    new double[] { 2000,  0.12 },
+                    new double[] { double.MaxValue, 0.03 },
+                };
+                var w = BracketWeights(items, br);
+                AddPool(MakeWeightedPool("w:bracket", "阶梯池", items, w, seed++));
+            }
+
+            // ---------- 3) 精英池：只收最贵的前 10% ----------
+            // 池内 20% 直接命中池里最顶尖的那批，其余按价倒数
+            {
+                int cnt = Math.Max(50, (int)(n * 0.10));
+                var items = byPrice.GetRange(n - cnt, cnt);
+                var w = new double[items.Count];
+                // 池内最贵的 20% 给高权重
+                int topCnt = Math.Max(1, (int)(items.Count * 0.20));
+                for (int i = 0; i < items.Count; i++)
+                {
+                    bool isTop = i >= items.Count - topCnt;
+                    w[i] = isTop ? 3.0 : 1.0;
+                }
+                AddPool(MakeWeightedPool("w:elite", "精英池", items, w, seed++));
+            }
+
+            // ---------- 4) 赌徒池 ----------
+            // 大奖权重显著抬高（约 12%），其余按价倒数 —— 最容易翻身的池
+            {
+                var items = new List<Item>(usable);
+                // 衰减更缓（halfLife 更大）-> 高档件本身就有可观份额
+                var w = RankWeights(items, 0.5, 4000);
+                // 再把最贵的 2% 名次额外加权，做成「赌大奖」的观感
+                int topCnt = Math.Max(1, (int)(items.Count * 0.02));
+                var rank = new int[items.Count];
+                for (int i = 0; i < items.Count; i++) rank[i] = i;
+                Array.Sort(rank, (a, b) => items[a].PriceUsdCents.CompareTo(items[b].PriceUsdCents));
+                for (int k = items.Count - topCnt; k < items.Count; k++)
+                    w[rank[k]] *= 12.0;
+                AddPool(MakeWeightedPool("w:riddle", "赌徒池", items, w, seed++));
+            }
+        }
+
+        void AddPool(Pool p) { Pools.Add(p); }
+
         private void BuildMiraclePools(List<Item> usable, ref int seed)
         {
             if (usable.Count < 200) return;
@@ -497,8 +730,10 @@ namespace Cs2Roulette
         private static int KindRank(string kind)
         {
             if (kind == "special") return 0;
-            if (kind == "category") return 1;
-            return 2;
+            if (kind == "miracle") return 1;
+            if (kind == "weighted") return 2;
+            if (kind == "category") return 3;
+            return 4;
         }
 
         public Item FindById(int id)
