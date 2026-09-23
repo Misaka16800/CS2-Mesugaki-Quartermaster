@@ -9,11 +9,15 @@
 
 > **不想折腾源码的，直接下这个 —— 双击安装，开箱即用。**
 
-### [**👉 点这里下载最新版安装包**](https://github.com/Misaka16800/CS2-Mesugaki-Quartermaster/releases/latest)
+### [**👉 GitHub Releases 下载**](https://github.com/Misaka16800/CS2-Mesugaki-Quartermaster/releases/latest)
 
-安装包文件名：`CS2雌小鬼军需_安装包_HFUT2026_CKX免费分享.exe`（约 162 MB）
+### [**👉 夸克网盘（国内推荐）**](https://pan.quark.cn/s/955f9568b6c1?pwd=gbpd) ｜ 提取码：`gbpd`
 
-**安装包已自带全部内容** —— 程序、题库、1722 张饰品图，**无需联网、无需额外下载**。
+> 国内访问 GitHub 可能不稳定，打不开就用**夸克网盘**那条。
+> 两个链接的文件是同一个，任选其一即可。
+
+安装包**约 162 MB**，已自带全部内容 —— 程序、题库、1722 张饰品图，
+**无需联网、无需额外下载**。
 
 | 项目 | 说明 |
 |---|---|
