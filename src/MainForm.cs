@@ -213,6 +213,7 @@ namespace Cs2Roulette
         Panel _reelHost;                    // 容纳 5 个堆叠卷轴
         NeonButton _btnDraw5;               // 五连抽按钮
         Label _lblCoins, _lblPoolInfo, _lblDrawCost, _lblStatus;
+        Label _lblCorner;                   // 右下角标识（淡淡的）
         Label _lblDebug;
         TextBox _txtDebug;
         string _vaultSummaryText = "";
@@ -259,10 +260,11 @@ namespace Cs2Roulette
         public MainForm(ItemDatabase db, string dataDir, SaveData save, bool autoDraw = false, int startTab = 0, bool forceJackpot = false, int autoPoolIndex = 0, bool benchDraw = false, bool testVault = false, bool testDebug = false, int testTrade = 0, bool testLimit = false, int testQuiz = 0, int quizDist = 0, int testCmp = 0, bool poolDump = false, long forceCoins = -1, string autoPoolKey = null, bool testCd = false, int drawCount = 1, bool testOffer = false, bool autoSell = false, bool autoKeep = false, string poolSwitch = null, bool showAbout = false, int poolStat = 0)
         {
             _ui = InitUiAssets(dataDir);
-            // F1 打开「关于」——水印入口，删起来麻烦
+            // F1 打开「关于」
             this.KeyPreview = true;
             this.KeyDown += (s, ev) => { if (ev.KeyCode == Keys.F1) ShowAbout(); };
-            if (_showAbout) Shown += (s, ev) => ShowAbout();
+            // 注意：必须用构造函数参数判断，不能读 _showAbout —— 它在本行之后才赋值
+            if (showAbout) Shown += (s, ev) => BeginInvoke((Action)ShowAbout);
             _db = db;
             _dataDir = dataDir;
             _save = save;
@@ -292,7 +294,7 @@ namespace Cs2Roulette
             if (benchDraw) { try { AttachConsole(-1); } catch { } }
             _cache = new ImageCache(System.IO.Path.Combine(dataDir, "images"));
 
-            Text = "CS2 雌小鬼军需 ｜ HFUT2026_CKX免费分享 ｜ 才不是给你白嫖的呢";
+            Text = "CS2 雌小鬼军需 ｜ 免费分享 ｜ 才不是给你白嫖的呢";
             var wa = Screen.FromPoint(Cursor.Position).WorkingArea;
             ClientSize = new Size(Math.Min(1280, wa.Width - 60), Math.Min(820, wa.Height - 60));
             MinimumSize = new Size(1040, 700);
@@ -645,7 +647,7 @@ namespace Cs2Roulette
             var header = new Panel { BackColor = Color.Transparent, Height = 110 };
             var title = new Label
             {
-                Text = "CS2 雌小鬼军需 ｜ HFUT2026_CKX免费分享",
+                Text = "CS2 雌小鬼军需",
                 Font = new Font("Microsoft YaHei UI", 16f, FontStyle.Bold),
                 ForeColor = TextMain,
                 BackColor = Color.Transparent,
@@ -654,7 +656,7 @@ namespace Cs2Roulette
             };
             var sub = new Label
             {
-                Text = "HFUT2026_CKX 免费分享 · 金币是本小姐赏你的，不能换钱啦",
+                Text = "本小姐免费赏你玩的 · 金币是本小姐赏的，不能换钱啦",
                 Font = new Font("Segoe UI", 8f, FontStyle.Bold),
                 ForeColor = Accent,
                 BackColor = Color.Transparent,
@@ -753,6 +755,20 @@ namespace Cs2Roulette
                 Font = new Font("Microsoft YaHei UI", 8.5f),
             };
             Controls.Add(_lblStatus);
+
+            // 角落标识：淡淡的，看得见但不碍事
+            _lblCorner = new Label
+            {
+                Height = StatusH,
+                Width = 150,
+                Text = "HFUT2026_CKX",
+                ForeColor = Color.FromArgb(58, 58, 92),   // 比背景略亮一点点
+                BackColor = Theme.CardBg2,
+                TextAlign = ContentAlignment.MiddleRight,
+                Padding = new Padding(0, 0, 14, 0),
+                Font = new Font("Segoe UI", 7.5f),
+            };
+            Controls.Add(_lblCorner);
 
             // 结构：顶部 header 固定高 110（含导航栏），底部状态栏 30
             // 页面容器�?���?��。用固定高度 + Padding 双重保险�?
@@ -1544,9 +1560,11 @@ namespace Cs2Roulette
             int pageH = Math.Max(80, h - HeaderH - StatusH);
             _pageHost.SetBounds(0, HeaderH, w, pageH);
             if (_lblStatus != null) _lblStatus.SetBounds(0, h - StatusH, w, StatusH);
+            if (_lblCorner != null) _lblCorner.SetBounds(w - 150, h - StatusH, 150, StatusH);
             _header.BringToFront();
             _pageHost.BringToFront();
             if (_lblStatus != null) _lblStatus.BringToFront();
+            if (_lblCorner != null) _lblCorner.BringToFront();
         }
 
         // ------------------------------------------------ 赚金币页
@@ -2307,7 +2325,7 @@ namespace Cs2Roulette
         {
             var f = new Form
             {
-                Text = "关于 · HFUT2026_CKX免费分享",
+                Text = "关于 · 本小姐是谁",
                 ClientSize = new Size(430, 300),
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
@@ -2330,7 +2348,7 @@ namespace Cs2Roulette
             };
             var lblMark = new Label
             {
-                Text = "HFUT2026_CKX免费分享    禁止倒卖收费",
+                Text = "免费分享 · 禁止倒卖收费",
                 Font = fMark,
                 ForeColor = Theme.Gold,
                 Location = new Point(22, 76),
@@ -2338,15 +2356,15 @@ namespace Cs2Roulette
             };
             var lblInfo = new Label
             {
-                Text = "C# WinForms 实现，无第三方依赖\n"
-                     + "金币与饰品均为虚拟，不涉及真实货币或交易\n"
-                     + "本程序由 HFUT2026_CKX 免费分享，请勿付费购买\n\n"
-                     + "如果它是你花钱买来的 —— 那你被骗了。\n\n"
-                     + "（按 F1 可随时打开本窗口）",
+                Text = "哼，本小姐是免费分享的，谁都不许拿本小姐去卖钱。\n"
+                     + "金币和饰品全是假的，不能换钱，也换不到真的。\n"
+                     + "C# WinForms 手写，没有任何第三方依赖。\n\n"
+                     + "你要是花钱买来的 —— 那你可真是个大笨蛋呢。\n\n"
+                     + "（按 F1 可以随时叫本小姐出来）",
                 Font = fBody,
                 ForeColor = Theme.TextDim,
                 Location = new Point(22, 116),
-                Size = new Size(386, 120),
+                Size = new Size(386, 130),
             };
             var btn = new NeonButton
             {
@@ -2361,6 +2379,7 @@ namespace Cs2Roulette
             f.Controls.Add(lblMark);
             f.Controls.Add(lblInfo);
             f.Controls.Add(btn);
+
             f.ShowDialog(this);
         }
 

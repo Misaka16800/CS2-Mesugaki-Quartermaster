@@ -144,6 +144,8 @@ namespace Cs2Roulette
                         autoSell = true;
                     else if (string.Equals(args[i], "--testoffer", StringComparison.OrdinalIgnoreCase))
                         testOffer = true;
+                    else if (string.Equals(args[i], "--about", StringComparison.OrdinalIgnoreCase))
+                        showAbout = true;
                     else if (string.Equals(args[i], "--testcd", StringComparison.OrdinalIgnoreCase))
                         testCd = true;
                     else if (string.Equals(args[i], "--poolstat", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
